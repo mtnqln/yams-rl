@@ -1,0 +1,20 @@
+[project]
+name = "yams-rl"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Martin Quilichini", email = "martin.quilichini2@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.5.4",
+    "torch>=2.15.0",
+]
+
+[project.scripts]
+yams-rl = "yams_rl:main"
+
+[build-system]
+requires = ["uv_build>=0.13.4,<0.14.0"]
+build-backend = "uv_build"
