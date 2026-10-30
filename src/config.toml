@@ -1,0 +1,7 @@
+[env]
+MAX_OPPONENTS = 10
+NB_DICES = 5
+NB_MAX_ROLL = 3
+
+[nn]
+SIZE_OUTPUT = 20

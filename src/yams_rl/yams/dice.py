@@ -1,8 +1,9 @@
 import numpy as np
+from numpy.random import SeedSequence
 
 
 class Dices:
-    def __init__(self, dice_number:int, seed:int):
+    def __init__(self, dice_number:int, seed:int|SeedSequence):
         self.dice_number = dice_number
         self.dices = np.zeros(shape=(dice_number,),dtype=int)
         self.generator = np.random.default_rng(seed=seed)

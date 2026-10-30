@@ -45,6 +45,7 @@ class GameState:
             else:
                 raise ValueError("No more dice roll possible")
         else:
+            action = Category(action)
             if action not in self.legal_score():
                 raise ValueError("Illegal move")
 
@@ -61,6 +62,9 @@ class GameState:
 
     def get_winner_score(self):
         return max(sum(list(pscore)) for pscore in self.players_and_scores.values())
+
+    def total(self):
+        return np.nansum(self.players_and_scores[self.current_player.name])
 
     def totals(self):
         return [sum(list(pscore)) for pscore in self.players_and_scores.values()]

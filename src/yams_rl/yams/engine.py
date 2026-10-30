@@ -1,10 +1,10 @@
+from numpy.random import SeedSequence
+
 from src.yams_rl.yams.players import Player
 from yams_rl.yams.game_state import Dices, GameState
-from yams_rl.yams.players import HumanPlayer
 
 
-def play_one_game(number_of_players: int,dice_number:int,seed:int)->list[int]:
-    players:list[Player] = [HumanPlayer(f"Player_{i}") for i in range(number_of_players)]
+def play_one_game(players: list[Player],dice_number:int,seed:int|SeedSequence)->list[int]:
     dices:Dices = Dices(dice_number=dice_number, seed=seed)
     state:GameState = GameState(players=players,dices=dices,nb_max_roll=3)
 
