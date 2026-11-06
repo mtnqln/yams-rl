@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from enum import StrEnum
+from functools import lru_cache
 
 import numpy as np
 
@@ -20,11 +23,21 @@ class Category(StrEnum):
     MOINS = "-"
 
     @property
+    @lru_cache
     def idx(self) -> int:
         return list(Category).index(self)
 
     @staticmethod
+    @lru_cache
+    def idx_from(action:int)->Category:
+        return list(Category)[action]
+
+    @staticmethod
     def get_list() -> np.ndarray:
-        return np.array(list(Category))
+        return np.array(Category,dtype=object)
+
+    @staticmethod
+    def size_category() -> int:
+        return len(list(Category))
 
 type Action = np.ndarray | Category
