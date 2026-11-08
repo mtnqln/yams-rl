@@ -5,6 +5,7 @@ from typing import Protocol
 
 import numpy as np
 import torch
+import torch.nn as nn
 
 from yams_rl.rl.config import Args
 from yams_rl.rl.model import Agent
@@ -33,7 +34,6 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
     """
     Execute one iteration of PPO algorithm : \\theta_{k+1} = argmax_{\\theta}E_{s,a~\\theta_k}[L(s,a,\\theta_k,\\theta)]
     """
-    seed = heavy_args.seed.integers(low=1,high=2**30)
     optimizer = heavy_args.optimizer
 
     slow_vec_envs = heavy_args.envs
@@ -46,9 +46,9 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
     log_pol = torch.zeros(size=(args.num_step,args.num_envs)) # each logpol is a scalar because it is taken for one state and action
     rewards = torch.zeros(size=(args.num_step,args.num_envs)) # on reward at each step
     actions = torch.zeros(size=(args.num_step,args.num_envs))
-    done = torch.zeros(size=(args.num_step,args.num_envs))
-    masks = torch.zeros(size=(args.num_step,args.num_envs,slow_vec_envs.single_action_space.n))
-    scores = torch.zeros_like(done)
+    done = torch.zeros(size=(args.num_step,args.num_envs),dtype=torch.int)
+    masks = torch.zeros(size=(args.num_step,args.num_envs,slow_vec_envs.single_action_space.n),dtype=torch.bool)
+    scores = torch.zeros_like(done,dtype=torch.float)
     entropys = torch.zeros_like(log_pol)
 
     next_obs = heavy_args.next_obs
@@ -59,7 +59,7 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
     for step in range(args.num_step):
 
         with torch.no_grad():
-            action,log_policy,entropy,value = agent.get_action_and_value(next_obs,next_mask)
+            action,log_policy,entropy,value = agent.get_action_and_value(obs=next_obs,action=None,mask=next_mask)
             obs, reward, terminated, truncated, info = slow_vec_envs.step(action)
 
             mask = slow_vec_envs.action_masks()
@@ -106,6 +106,8 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
     new_log_pol = log_policy
     values = agent.get_value(observations)
 
+    assert values.shape == reward_to_go.shape
+
     ### Optimizing ###
     # Buffer for the loss values
     loss_critic = torch.zeros(size=(args.num_optimizer_step,args.num_envs))
@@ -114,6 +116,11 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
 
         # The actor
         ratio_pol = torch.exp(new_log_pol-log_pol)
+        if i==0:
+            # for the first iteration of the optimizer the new policy is supposed to be equal to the ref policy
+            assert ratio_pol.isclose(torch.full_like(ratio_pol,fill_value=1.),atol=1e-10,rtol=0).all()
+        if args.norm_adv:
+            advantage_GAE = (advantage_GAE - advantage_GAE.mean(dim=0)) / (advantage_GAE.std(dim=0)+1e-12 )
         L = torch.min(advantage_GAE * ratio_pol , advantage_GAE*torch.clip(input=ratio_pol, min=1-args.clip_epsilon,max=1+args.clip_epsilon))
         expected_minus_L = -L.mean(dim=0).mean() # -L because AdamW minimize by default
         expected_minus_L.backward()
@@ -123,6 +130,7 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
         value_loss.backward()
 
         # Running one optimizer step
+        nn.utils.clip_grad_norm_(parameters=agent.parameters(),max_norm=args.max_gradient_norm)
         optimizer.step()
         optimizer.zero_grad()
 
@@ -133,13 +141,17 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
         loss_critic[i] = value_loss.item()
         loss_actor[i] = expected_minus_L.item()
 
-    heavy_args.logger.add_scalar("Loss/actor",loss_critic,heavy_args.logger_step)
-    heavy_args.logger.add_scalar("Loss/critic",loss_actor,heavy_args.logger_step)
+    heavy_args.logger.add_scalar("Loss/actor",loss_actor.mean(),heavy_args.logger_step)
+    heavy_args.logger.add_scalar("Loss/critic",loss_critic.mean(),heavy_args.logger_step)
     heavy_args.logger.add_scalar("Loss/entropy",entropys.mean().mean().item(),heavy_args.logger_step)
-
-    heavy_args.logger.add_scalar("Actor/total",scores[done].mean(dtype=torch.float).item(),heavy_args.logger_step)
 
     heavy_args.logger.add_scalar("Critic/value",value.mean().mean().item(),heavy_args.logger_step)
     heavy_args.logger.add_scalar("Critic/reward_to_go",reward_to_go.mean().mean().item(),heavy_args.logger_step)
 
-    return observations, done, info
+    if done.any():
+        agents_mean_score = scores[done.bool()].mean(dtype=torch.float).item()
+        heavy_args.logger.add_scalar("Actor/total",agents_mean_score,heavy_args.logger_step)
+
+        return next_obs, done, next_mask , agents_mean_score
+    else:
+        return next_obs, done, next_mask, torch.nan

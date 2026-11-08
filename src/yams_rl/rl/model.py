@@ -1,7 +1,8 @@
-from torch.distributions import Categorical
-from torch import nn
 import numpy as np
 import torch
+from torch import nn
+from torch.distributions import Categorical
+
 
 def layer_init(layer:nn.Linear,scl:float=np.sqrt(2),bias_const=0.0):
     torch.nn.init.orthogonal_(layer.weight,scl)
@@ -13,7 +14,7 @@ class Agent(nn.Module):
     def __init__(self,size_input:int,size_output:int)->None:
         super().__init__()
 
-        self.inf_mask = torch.full(fill_value=torch.finfo(torch.float32).min,size=(size_input,))
+        self.inf_mask = torch.full(fill_value=torch.finfo(torch.float32).min,size=(size_output,))
 
         # Network that will learn the policy
         self.actor = nn.Sequential(
@@ -48,18 +49,18 @@ class Agent(nn.Module):
         logits = self.actor(obs)
         return logits
 
-    def get_action_and_value(self,obs,action:torch.Tensor|None=None,mask=None):
+    def get_action_and_value(self,obs,action:torch.Tensor|None=None,mask:torch.Tensor|None=None):
         """
         Returns action,log prob, entropy and Value for a given observation and/or action
         Apply a -inf mask on the logits where a True in the mask is considered as a valid action
         """
         logits = self.actor(obs)
-        if mask:
+        if mask is not None:
             logits = logits + (~mask)*self.inf_mask
         prob = Categorical(logits=logits)
         if action is None:
             action = prob.sample()
-        return action,prob.log_prob(action),prob.entropy(),self.critic(obs)
+        return action,prob.log_prob(action),prob.entropy(),self.critic(obs).squeeze(-1)
 
     def get_value(self,obs):
-        return self.critic(obs)
+        return self.critic(obs).squeeze(-1) # to remove the last dim which is always equal to 1

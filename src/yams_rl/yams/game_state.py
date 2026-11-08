@@ -21,7 +21,7 @@ class GameState:
         self.dices.roll(reroll_mask=np.ones(self.dices.dice_number, dtype=bool))
         self.current_player_roll_number = 1
 
-    def is_over(self):
+    def is_over(self)->np.bool:
         return ~np.isnan(self.players_and_scores).any()
 
     def scores(self,player_id:int,category:Category,dices:Dices):

@@ -2,7 +2,6 @@ from typing import Literal
 
 import gymnasium as gym
 import numpy as np
-import torch
 
 from yams_rl.rl.constant import MAX_OPPONENTS
 from yams_rl.rl.utils import nn_output_to_action
@@ -11,6 +10,23 @@ from yams_rl.yams.constant import NB_DICES, NB_MAX_ROLLS
 from yams_rl.yams.dice import Dices
 from yams_rl.yams.game_state import GameState
 from yams_rl.yams.players import Player
+
+
+class WrapperCartPole(gym.Wrapper):
+    def __init__(self,cartpole_env:gym.Env):
+        super().__init__(cartpole_env)
+        self.cartpole = cartpole_env
+        self.reward = 0
+
+    def reset(self,seed:int|None=None,options:dict|None=None):
+        self.reward = 0
+        return self.cartpole.reset(seed=seed,options=options)
+
+    def step(self,action):
+        observation, reward, terminated, truncated, info = self.cartpole.step(action)
+        self.reward += float(reward)
+        info["agent_score"] = self.reward
+        return observation.astype(np.float32), reward, terminated, truncated, info
 
 
 class YamsEnv(gym.Env):
@@ -60,11 +76,10 @@ class YamsEnv(gym.Env):
         """Builds the action mask for the nn output; True is a valid action"""
         legal_score = self.state.legal_score_mask()
         reroll = self.state.reroll_possible()
+        dice_part = np.full(fill_value=reroll,shape=(2**self.dice_number,))
+        scoring_part = legal_score
 
-        dice_part = torch.full(fill_value=reroll,size=(2**self.dice_number,))
-        scoring_part = torch.from_numpy(legal_score)
-
-        return torch.concat((scoring_part,dice_part)).to(torch.bool)
+        return np.concat((scoring_part,dice_part)).astype(np.bool)
 
     def agent_score(self):
         """Return the agent current score, with potential Nan inside so no fake values can go through training unnoticed"""
@@ -89,7 +104,7 @@ class YamsEnv(gym.Env):
 
         opponents_playing = np.array([1 if i<self.nb_players-1 else 0 for i in range(self.MAX_OPPONENTS)])
 
-        opponents_grids = np.delete(self.state.players_and_scores,self.state.current_player_id,axis=0)
+        opponents_grids = np.delete(self.state.players_and_scores,self.agent_id,axis=0)
         # Filling up the non-playing player grid
         if len(opponents_grids) < self.MAX_OPPONENTS:
             diff = self.MAX_OPPONENTS - len(opponents_grids)
@@ -144,9 +159,9 @@ class YamsEnv(gym.Env):
             tuple: (observation, reward, terminated, truncated, info)
         """
         actual_action = nn_output_to_action(action)
-        score_before = self.state.total_current_player()
+        score_before = self.agent_score()
         self.state.step(actual_action)
-        score_after = self.state.total_current_player()
+        score_after = self.agent_score()
 
         if self.reward_mode == "delta":
             reward = (score_after - score_before) / self.normalization_const # normalization
@@ -159,7 +174,7 @@ class YamsEnv(gym.Env):
 
         observation = self._get_obs()
 
-        terminated = self.state.is_over()
+        terminated = self.state.is_over() # type is np.bool_
         truncated = False
 
-        return observation, reward, terminated, truncated, {"agent_score":self.agent_score()} #info
+        return observation, reward, bool(terminated), truncated, {"agent_score":self.agent_score()} #info
