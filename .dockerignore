@@ -1,0 +1,7 @@
+runs/
+models/
+.venv/
+.git/
+*.pyc
+*.pyo
+__pycache__/

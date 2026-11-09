@@ -1,7 +1,7 @@
 [project]
 name = "yams-rl"
 version = "0.1.0"
-description = "Add your description here"
+description = "RL agent to play Yams"
 readme = "README.md"
 authors = [
     { name = "Martin Quilichini", email = "martin.quilichini2@gmail.com" }
