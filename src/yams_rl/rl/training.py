@@ -25,7 +25,7 @@ def train_agent(args:Args):
     if args.env_id=="CartPole-v1":
         list_env = [WrapperCartPole(gym.make(args.env_id)) for _ in range(args.num_envs)]
     else:
-        list_env = [YamsEnv(nb_players=args.num_player,reward_mode=args.reward_mode) for _ in range(args.num_envs)]
+        list_env = [YamsEnv(nb_players=args.num_player,reward_mode=args.reward_mode,reward_norm_const=args.reward_norm_const) for _ in range(args.num_envs)]
 
     envs = SlowVecEnv(envs=list_env,generator=generator,args=args)
 
@@ -66,7 +66,16 @@ def train_agent(args:Args):
         score[i] = mean_score
         heavy_args.logger_step += args.num_step*args.num_envs # This counter allow to compare different runs with different num_step or num_envs
 
-    torch.save(agent.state_dict(),f"models/agent_{args.env_id}_{timestamp}.pt")
+    save_dict = {
+        "model_state_dict":agent.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        "size_input":size_input[0],
+        "size_output":size_output,
+        "training_config":dataclasses.asdict(args),
+        "step_done":args.num_ppo_iter*(args.num_step*args.num_envs)
+
+    }
+    torch.save(save_dict,f"models/agent_{args.env_id}_{timestamp}.pt")
 
     # TODO: replace the hparam/score with a real evaluation metric
     writer.add_hparams(hparam_dict=dataclasses.asdict(args),metric_dict={"hparam/score":score.nanmean()})

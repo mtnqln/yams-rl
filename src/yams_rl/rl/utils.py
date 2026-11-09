@@ -1,3 +1,4 @@
+import torch
 
 from itertools import product
 from typing import overload
@@ -18,9 +19,14 @@ def nn_output_to_action(nn_action:int)->Action: ...
 @overload
 def nn_output_to_action(nn_action:np.ndarray)->np.ndarray: ...
 
-def nn_output_to_action(nn_action:int|np.ndarray)->Action|np.ndarray:
+@overload
+def nn_output_to_action(nn_action:torch.Tensor)->torch.Tensor: ...
+
+def nn_output_to_action(nn_action:int|np.ndarray|torch.Tensor)->Action|np.ndarray|torch.Tensor:
     if isinstance(nn_action,np.ndarray):
         return Category.get_list()[nn_action]
+    elif isinstance(nn_action,torch.Tensor):
+        pass
     else:
         if Category.size_category() - 1 < nn_action:
             return nn_to_dices_mapping(nn_action)

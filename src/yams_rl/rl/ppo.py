@@ -49,7 +49,6 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
     done = torch.zeros(size=(args.num_step,args.num_envs),dtype=torch.int)
     masks = torch.zeros(size=(args.num_step,args.num_envs,slow_vec_envs.single_action_space.n),dtype=torch.bool)
     scores = torch.zeros_like(done,dtype=torch.float)
-    entropys = torch.zeros_like(log_pol)
 
     next_obs = heavy_args.next_obs
     next_mask = heavy_args.next_mask
@@ -59,13 +58,12 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
     for step in range(args.num_step):
 
         with torch.no_grad():
-            action,log_policy,entropy,value = agent.get_action_and_value(obs=next_obs,action=None,mask=next_mask)
+            action,log_policy,_,value = agent.get_action_and_value(obs=next_obs,action=None,mask=next_mask)
             obs, reward, terminated, truncated, info = slow_vec_envs.step(action)
 
             mask = slow_vec_envs.action_masks()
 
             log_pol[step] = log_policy
-            entropys[step] = entropy
             values[step] = value
             rewards[step] = reward
             done[step] = torch.logical_or(terminated,truncated)
@@ -108,6 +106,10 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
 
     assert values.shape == reward_to_go.shape
 
+    if args.norm_adv:
+        advantage_GAE = (advantage_GAE - advantage_GAE.mean()) / (advantage_GAE.std()+1e-8 )
+
+
     ### Optimizing ###
     # Buffer for the loss values
     loss_critic = torch.zeros(size=(args.num_optimizer_step,args.num_envs))
@@ -119,11 +121,10 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
         if i==0:
             # for the first iteration of the optimizer the new policy is supposed to be equal to the ref policy
             assert ratio_pol.isclose(torch.full_like(ratio_pol,fill_value=1.),atol=1e-10,rtol=0).all()
-        if args.norm_adv:
-            advantage_GAE = (advantage_GAE - advantage_GAE.mean(dim=0)) / (advantage_GAE.std(dim=0)+1e-12 )
         L = torch.min(advantage_GAE * ratio_pol , advantage_GAE*torch.clip(input=ratio_pol, min=1-args.clip_epsilon,max=1+args.clip_epsilon))
         expected_minus_L = -L.mean(dim=0).mean() # -L because AdamW minimize by default
-        expected_minus_L.backward()
+        pg_loss_actor = expected_minus_L - args.entropy_coef*entropy.mean()
+        pg_loss_actor.backward()
 
         # The critic
         value_loss = ((values-reward_to_go)**2).mean(dim=0).mean()
@@ -134,8 +135,9 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
         optimizer.step()
         optimizer.zero_grad()
 
-        _,log_policy,entropy,value = agent.get_action_and_value(observations,actions,masks)
+        _,log_policy,ent,value = agent.get_action_and_value(observations,actions,masks)
         values = agent.get_value(observations)
+        entropy = ent.clone()
         new_log_pol = log_policy
 
         loss_critic[i] = value_loss.item()
@@ -143,10 +145,10 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
 
     heavy_args.logger.add_scalar("Loss/actor",loss_actor.mean(),heavy_args.logger_step)
     heavy_args.logger.add_scalar("Loss/critic",loss_critic.mean(),heavy_args.logger_step)
-    heavy_args.logger.add_scalar("Loss/entropy",entropys.mean().mean().item(),heavy_args.logger_step)
+    heavy_args.logger.add_scalar("Loss/entropy",entropy.mean().item(),heavy_args.logger_step)
 
-    heavy_args.logger.add_scalar("Critic/value",value.mean().mean().item(),heavy_args.logger_step)
-    heavy_args.logger.add_scalar("Critic/reward_to_go",reward_to_go.mean().mean().item(),heavy_args.logger_step)
+    heavy_args.logger.add_scalar("Critic/value",value.mean().item(),heavy_args.logger_step)
+    heavy_args.logger.add_scalar("Critic/reward_to_go",reward_to_go.mean().item(),heavy_args.logger_step)
 
     if done.any():
         agents_mean_score = scores[done.bool()].mean(dtype=torch.float).item()

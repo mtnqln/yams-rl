@@ -1,7 +1,16 @@
+from __future__ import annotations
+
 import numpy as np
 import torch
 from torch import nn
 from torch.distributions import Categorical
+
+
+def load_model(model_path:str,eval:bool=True)->Agent:
+        checkpoint = torch.load(model_path,weights_only=True)
+        model = Agent(size_input=checkpoint["size_input"],size_output=checkpoint["size_output"])
+        model.load_state_dict(checkpoint["model_state_dict"])
+        return model.eval() if eval else model.train()
 
 
 def layer_init(layer:nn.Linear,scl:float=np.sqrt(2),bias_const=0.0):
@@ -14,6 +23,8 @@ class Agent(nn.Module):
     def __init__(self,size_input:int,size_output:int)->None:
         super().__init__()
 
+        self.size_output = size_output
+        self.size_input = size_input
         self.inf_mask = torch.full(fill_value=torch.finfo(torch.float32).min,size=(size_output,))
 
         # Network that will learn the policy

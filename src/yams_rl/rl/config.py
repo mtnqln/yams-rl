@@ -9,6 +9,7 @@ class Args:
     """Seed for random reproducibility"""
     env_id: Literal["CartPole-v1","YamsEnv"] = "YamsEnv"
     """The id of the environment"""
+
     num_ppo_iter: int = 15_000
     """The number of ppo iteration"""
     num_step: int = 256
@@ -17,8 +18,12 @@ class Args:
     """The number of parallel game environments"""
     num_player: int = 1
     """Number of player per environment; currently only support one"""
+
     reward_mode: Literal["delta","victory"] = "delta"
     """Reward mode to train the agent for the Yams environment, victory is 1=win 0=loose; delta is the difference of score between each round"""
+    reward_norm_const: int = 25
+    """Normalization constant for the reward"""
+
     num_optimizer_step: int = 10
     """The number of optimizer steps to run per ppo update"""
     clip_epsilon: float = 0.2
@@ -35,3 +40,20 @@ class Args:
     """Optimizer learning rate"""
     optim_eps: float = 1e-5
     """Optimizer (AdamW) epsilon"""
+    entropy_coef: float = 0.01
+    """Coefficient for the entropy term in the loss"""
+
+@dataclass
+class EvalArgs:
+    model_path: str = "models/agent.pt"
+    """Path to the model weights"""
+    player_type: Literal["RandomPlayer","Agent","GreedyPlayer"] = "RandomPlayer"
+    """Type of player to evaluate"""
+    size_evaluation: int = 10_000
+    """Number of evaluations to run"""
+    number_players: int = 1
+    """Number of player to put in the evaluation"""
+    stochastic_policy: bool = True
+    """Whether to use stochastic policy or deterministic policy (for the neural network)"""
+    seed_offset: int = 0
+    """Offset to add to the seed generator key in order to change randomness for the eval"""

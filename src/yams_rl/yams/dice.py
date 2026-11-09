@@ -16,3 +16,4 @@ class Dices:
     def roll(self,reroll_mask:np.ndarray):
         new_roll = self.generator.integers(low=1,high=7,size=self.dice_number)
         self.dices[reroll_mask] = new_roll[reroll_mask]
+        self.dices.sort()
