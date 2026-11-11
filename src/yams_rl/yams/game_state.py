@@ -33,7 +33,7 @@ class GameState:
         grid = self.players_and_scores[player_id]
         for idx in range(Category.size_category()):
             scores[idx] = score(category=Category.idx_from(idx),dices=self.dices)
-        scores[np.isnan(grid)] = 0 # for non legal score we set to 0, the model has already an input flag indicating if the case is legal or not
+        scores[~np.isnan(grid)] = 0 # for non legal score we set to 0, the model has already an input flag indicating if the case is legal or not
         return scores
 
     def legal_score(self)->list[Category]:

@@ -24,7 +24,7 @@ def build_observation(state:GameState,nb_players:int,agent_id:int)->np.ndarray:
 
     agent_grid = state.players_and_scores[agent_id].copy()
     agent_grid_mask = (~np.isnan(agent_grid)).astype(int)
-    agent_grid[~np.isnan(agent_grid)] = 0 # converting None to 0
+    agent_grid[np.isnan(agent_grid)] = 0 # converting None to 0
     agent_grid = agent_grid.astype(int) # converting to int if it's not already the case
 
     possible_scores = state.get_all_possible_scores(player_id=agent_id)
