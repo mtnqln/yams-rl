@@ -24,8 +24,10 @@ def build_observation(state:GameState,nb_players:int,agent_id:int)->np.ndarray:
 
     agent_grid = state.players_and_scores[agent_id].copy()
     agent_grid_mask = (~np.isnan(agent_grid)).astype(int)
-    agent_grid[np.isnan(agent_grid)] = 0 # converting None to 0
+    agent_grid[~np.isnan(agent_grid)] = 0 # converting None to 0
     agent_grid = agent_grid.astype(int) # converting to int if it's not already the case
+
+    possible_scores = state.get_all_possible_scores(player_id=agent_id)
 
     opponents_playing = np.array([1 if i<nb_players-1 else 0 for i in range(MAX_OPPONENTS)])
 
@@ -44,6 +46,7 @@ def build_observation(state:GameState,nb_players:int,agent_id:int)->np.ndarray:
     observation = np.concatenate((
         np.array([rolls_left])/SCALE_REROLL,
         rolled_dices/SCALE_DICE_SCORE,
+        possible_scores/SCALE_PLAYER_GRID,
         agent_grid/SCALE_PLAYER_GRID,
         agent_grid_mask,
         opponents_playing,

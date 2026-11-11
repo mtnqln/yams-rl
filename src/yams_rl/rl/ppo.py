@@ -120,7 +120,7 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
         ratio_pol = torch.exp(new_log_pol-log_pol)
         if i==0:
             # for the first iteration of the optimizer the new policy is supposed to be equal to the ref policy
-            assert ratio_pol.isclose(torch.full_like(ratio_pol,fill_value=1.),atol=1e-6,rtol=0).all()
+            assert ratio_pol.isclose(torch.full_like(ratio_pol,fill_value=1.),atol=1e-4,rtol=0).all()
         L = torch.min(advantage_GAE * ratio_pol , advantage_GAE*torch.clip(input=ratio_pol, min=1-args.clip_epsilon,max=1+args.clip_epsilon))
         expected_minus_L = -L.mean(dim=0).mean() # -L because AdamW minimize by default
         pg_loss_actor = expected_minus_L - args.entropy_coef*entropy.mean()

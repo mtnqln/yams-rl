@@ -1,4 +1,5 @@
 import dataclasses
+import os
 from datetime import datetime
 
 import gymnasium as gym
@@ -38,6 +39,7 @@ def train_agent(args:Args):
         agent.parameters(),
         lr=args.optim_lr,
         eps=args.optim_eps,
+        weight_decay=0 # using Adam
     )
 
     next_obs,_ = envs.reset()
@@ -56,9 +58,21 @@ def train_agent(args:Args):
             logger_step=0
         )
 
+    assert args.entropy_decay_iter_start<=args.num_ppo_iter
+    assert args.lr_decay_iter_start<=args.num_ppo_iter
+
     score = torch.zeros(size=(args.num_ppo_iter,))
     for i in range(args.num_ppo_iter):
         print(f"Run PPO {i+1}/{args.num_ppo_iter}")
+
+        if args.lr_decay and i>=args.lr_decay_iter_start:
+            lr_step = (args.optim_lr - args.lr_decay_min)/(args.num_ppo_iter-args.lr_decay_iter_start)
+            heavy_args.optimizer.param_groups[0]["lr"] -= lr_step
+
+        if args.entropy_coef_decay and i>=args.entropy_decay_iter_start:
+            entropy_coef_step = (args.entropy_coef - args.entropy_decay_min)/(args.num_ppo_iter-args.lr_decay_iter_start)
+            args.entropy_coef -= entropy_coef_step
+
         observations, done, mask, mean_score = run_one_ppo_iter(args=args,heavy_args=heavy_args)
         heavy_args.next_done = done[-1]
         heavy_args.next_obs = observations
@@ -75,6 +89,8 @@ def train_agent(args:Args):
         "step_done":args.num_ppo_iter*(args.num_step*args.num_envs)
 
     }
+
+    os.makedirs("models/",exist_ok=True)
     torch.save(save_dict,f"models/agent_{args.env_id}_{timestamp}.pt")
 
     # TODO: replace the hparam/score with a real evaluation metric

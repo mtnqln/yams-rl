@@ -50,12 +50,14 @@ class YamsEnv(gym.Env):
         # The agent can see :
             # the number of roll left
             # the dices
+            # The scores available for each case for the current dices
             # his grid with a same size array indicating if the case is not filled yet (with 1 or 0)
             # how many players play
             # the grid of all the players with same size arrays for each players indicating if the case is not filled yet (1 or 0)
         self.size_input = (
             1 +
             self.dice_number +
+            Category.size_category() +
             2*Category.size_category() +
             MAX_OPPONENTS +
             2*MAX_OPPONENTS * Category.size_category()

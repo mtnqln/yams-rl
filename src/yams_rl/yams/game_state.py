@@ -28,6 +28,14 @@ class GameState:
         score_value = score(category=category, dices=dices)
         self.players_and_scores[player_id][category.idx] = score_value
 
+    def get_all_possible_scores(self,player_id:int):
+        scores = np.zeros(shape=Category.size_category())
+        grid = self.players_and_scores[player_id]
+        for idx in range(Category.size_category()):
+            scores[idx] = score(category=Category.idx_from(idx),dices=self.dices)
+        scores[np.isnan(grid)] = 0 # for non legal score we set to 0, the model has already an input flag indicating if the case is legal or not
+        return scores
+
     def legal_score(self)->list[Category]:
         grid = self.players_and_scores[self.current_player_id]
         legal_actions = Category.get_list()[np.isnan(grid)].tolist()

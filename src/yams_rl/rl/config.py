@@ -42,6 +42,18 @@ class Args:
     """Optimizer (AdamW) epsilon"""
     entropy_coef: float = 0.01
     """Coefficient for the entropy term in the loss"""
+    lr_decay: bool = True
+    """Toggle the decay of the learning rate for the optimizer"""
+    lr_decay_iter_start: int = 10_000
+    """Number of iteration after which the lr decay starts"""
+    lr_decay_min: float = 1e-8
+    """Minimum value to be reach by the lr decay"""
+    entropy_coef_decay: bool = True
+    """Toggle the decay of the entropy coeff"""
+    entropy_decay_iter_start: int = 10_000
+    """Number of iteration after which the entropy coeff decay starts"""
+    entropy_decay_min: float = 0.001
+    """Minimum value for the entropy coef decay"""
 
 @dataclass
 class EvalArgs:
