@@ -30,7 +30,7 @@ class Args:
     """ppo clip coefficient"""
     gae_gamma: float = 1
     """GAE gamma coefficient"""
-    gae_lambda: float = 0.95
+    gae_lambda: float = 1
     """GAE lambda coefficient"""
     norm_adv: bool = True
     """Wether to use advantages normalization"""

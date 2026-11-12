@@ -1,6 +1,12 @@
 from __future__ import annotations
+from yams_rl.yams.scoring import score, score_arr
+from collections import Counter
+from yams_rl.yams.dice import Dices
+from numpy.lib.stride_tricks import sliding_window_view
+from math import factorial
 
-from typing import TYPE_CHECKING
+from functools import cache, lru_cache
+from typing import TYPE_CHECKING, Iterable
 
 import numpy as np
 from numpy.random import SeedSequence
@@ -10,7 +16,7 @@ from yams_rl.yams.categories import Action, Category
 if TYPE_CHECKING:
     from yams_rl.yams.game_state import GameState
 from abc import ABC, abstractmethod
-from itertools import product
+from itertools import combinations_with_replacement, product
 
 
 class Player(ABC):
@@ -77,3 +83,51 @@ class RandomPlayer(Player):
         idx_action = self.generator.integers(low=0,high=size_actions)
 
         return possible_actions[idx_action]
+
+
+class GreedyPlayer(Player):
+    def __init__(self, name: str):
+        self.name = name
+
+    def act(self,state:GameState)->Action:
+        grid = state.players_and_scores[state.current_player_id]
+        valid_action:np.ndarray = np.isnan(grid)
+        if state.current_player_roll_number >= state.nb_max_roll:
+            valid_score = score_once(tuple(state.dices.dices.tolist()),tuple(valid_action.tolist()))
+            return state.legal_score()[np.array(valid_score).argmax()]
+        else:
+            expectations = np.array(compute_expectations(dices=tuple(state.dices.dices.tolist()),dice_number=state.dices.dice_number,valid_action=tuple(valid_action.tolist())))
+            if max(score_once(tuple(state.dices.dices.tolist()),tuple(valid_action.tolist())))>= expectations.max():
+                valid_score = score_once(tuple(state.dices.dices.tolist()),tuple(valid_action.tolist()))
+                return state.legal_score()[np.array(valid_score).argmax()]
+            else:
+                return build_masks(state.dices.dice_number)[expectations.argmax()]
+
+def build_masks(dice_number:int)->np.ndarray:
+    return np.array([np.array(reroll_mask,dtype=bool) for reroll_mask in product([True,False],repeat=dice_number)])
+
+@cache
+def score_once(d:tuple,vc:tuple)->tuple:
+    dices = np.array(d)
+    valid_category = np.array(vc)
+    scores = []
+    for c in np.array(Category.get_list())[valid_category]:
+        scores.append(score_arr(c,dices))
+    return tuple(scores)
+
+@cache
+def compute_expectations(dices:tuple,dice_number:int,valid_action:tuple)->list[float]:
+    masks = build_masks(dice_number=dice_number)
+    expected_val = []
+    for m in masks:
+        rerolls = m.sum()
+        new_rolls = product([1,2,3,4,5,6],repeat=rerolls)
+        exp = []
+        dices_arr = np.array(dices)
+        for p in new_rolls:
+            new_dices = dices_arr.copy()
+            new_dices[m] = p
+            new_dices.sort()
+            exp.append((1/6)**rerolls * max(score_once(tuple(new_dices.tolist()),valid_action)))
+        expected_val.append(np.array(exp).sum())
+    return expected_val

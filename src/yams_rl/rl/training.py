@@ -58,8 +58,10 @@ def train_agent(args:Args):
             logger_step=0
         )
 
-    assert args.entropy_decay_iter_start<=args.num_ppo_iter
-    assert args.lr_decay_iter_start<=args.num_ppo_iter
+    if args.entropy_coef_decay:
+        assert args.entropy_decay_iter_start<=args.num_ppo_iter
+    if args.lr_decay:
+        assert args.lr_decay_iter_start<=args.num_ppo_iter
 
     score = torch.zeros(size=(args.num_ppo_iter,))
     for i in range(args.num_ppo_iter):
@@ -83,8 +85,8 @@ def train_agent(args:Args):
     save_dict = {
         "model_state_dict":agent.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        "size_input":size_input[0],
-        "size_output":size_output,
+        "size_input":int(size_input[0]),
+        "size_output":int(size_output),
         "training_config":dataclasses.asdict(args),
         "step_done":args.num_ppo_iter*(args.num_step*args.num_envs)
 

@@ -28,7 +28,7 @@ class GameState:
         score_value = score(category=category, dices=dices)
         self.players_and_scores[player_id][category.idx] = score_value
 
-    def get_all_possible_scores(self,player_id:int):
+    def get_all_possible_scores(self,player_id:int)->np.ndarray:
         scores = np.zeros(shape=Category.size_category())
         grid = self.players_and_scores[player_id]
         for idx in range(Category.size_category()):
