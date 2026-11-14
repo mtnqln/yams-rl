@@ -5,7 +5,7 @@ from typing import Protocol
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 from yams_rl.rl.config import Args
 from yams_rl.rl.model import Agent
@@ -100,45 +100,70 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
             last_reward_to_go = reward_to_go[t]
 
     agent.train()
-    _,log_policy,entropy,value = agent.get_action_and_value(observations,actions,masks)
-    new_log_pol = log_policy
-    values = agent.get_value(observations)
 
     assert values.shape == reward_to_go.shape
 
     if args.norm_adv:
         advantage_GAE = (advantage_GAE - advantage_GAE.mean()) / (advantage_GAE.std()+1e-8 )
 
+    # Flatten the buffers
+    observations = observations.reshape((-1,) + slow_vec_envs.single_observation_space.shape)  # ty: ignore[unsupported-operator]
+    values = values.reshape(-1)
+    log_pol = log_pol.reshape(-1)
+    rewards = rewards.reshape(-1) # useless but for consistency
+    actions = actions.reshape(-1)
+    done = done.reshape(-1)
+    masks = masks.reshape((-1,slow_vec_envs.single_action_space.n))
+    scores = scores.reshape(-1)
+    advantage_GAE = advantage_GAE.reshape(-1)
+    reward_to_go = reward_to_go.reshape(-1)
+
 
     ### Optimizing ###
+    # Batch in RL is everything that was collected during a rollout
+    # Minibatch is the equivalent of the batch in supervised learning
+    batch_size = int(args.num_envs*args.num_step)
+    minibatch_size = batch_size // args.num_minibatches
     # Buffer for the loss values
-    loss_critic = torch.zeros(size=(args.num_optimizer_step,args.num_envs))
-    loss_actor = torch.zeros(size=(args.num_optimizer_step,args.num_envs))
-    for i in range(args.num_optimizer_step):
+    loss_critic = torch.zeros(size=(args.num_epochs_optim,args.num_envs))
+    loss_actor = torch.zeros(size=(args.num_epochs_optim,args.num_envs,))
+    b_inds = np.arange(batch_size)
+    clip_frac = []
+    approx_kl:float
+    for i in range(args.num_epochs_optim):
+        np.random.shuffle(b_inds)
+        for start in range(0,batch_size,minibatch_size):
+            end = start + minibatch_size
+            mb_inds = b_inds[start:end]
 
-        # The actor
-        ratio_pol = torch.exp(new_log_pol-log_pol)
-        if i==0:
-            # for the first iteration of the optimizer the new policy is supposed to be equal to the ref policy
-            assert ratio_pol.isclose(torch.full_like(ratio_pol,fill_value=1.),atol=1e-4,rtol=0).all()
-        L = torch.min(advantage_GAE * ratio_pol , advantage_GAE*torch.clip(input=ratio_pol, min=1-args.clip_epsilon,max=1+args.clip_epsilon))
-        expected_minus_L = -L.mean(dim=0).mean() # -L because AdamW minimize by default
-        pg_loss_actor = expected_minus_L - args.entropy_coef*entropy.mean()
-        pg_loss_actor.backward()
+            _,log_policy,ent,value = agent.get_action_and_value(observations[mb_inds],actions[mb_inds],masks[mb_inds])
+            values = agent.get_value(observations[mb_inds])
+            entropy = ent.clone()
+            new_log_pol = log_policy
 
-        # The critic
-        value_loss = ((values-reward_to_go)**2).mean(dim=0).mean()
-        value_loss.backward()
+            # The actor
+            logratio = new_log_pol-log_pol[mb_inds]
+            ratio_pol = torch.exp(logratio)
+            with torch.no_grad():
+                approx_kl = ((ratio_pol-1) - logratio).mean()
+                clip_frac += [((ratio_pol - 1.0).abs() > args.clip_epsilon).float().mean().item()]
 
-        # Running one optimizer step
-        nn.utils.clip_grad_norm_(parameters=agent.parameters(),max_norm=args.max_gradient_norm)
-        optimizer.step()
-        optimizer.zero_grad()
+            if i==0 and start==0:
+                # for the first iteration of the optimizer the new policy is supposed to be equal to the ref policy
+                assert ratio_pol.isclose(torch.full_like(ratio_pol,fill_value=1.),atol=1e-4,rtol=0).all()
+            L = torch.min(advantage_GAE[mb_inds] * ratio_pol , advantage_GAE[mb_inds]*torch.clip(input=ratio_pol, min=1-args.clip_epsilon,max=1+args.clip_epsilon))
+            expected_minus_L = -L.mean() # -L because AdamW minimize by default
+            pg_loss_actor = expected_minus_L - args.entropy_coef*entropy.mean()
+            pg_loss_actor.backward()
 
-        _,log_policy,ent,value = agent.get_action_and_value(observations,actions,masks)
-        values = agent.get_value(observations)
-        entropy = ent.clone()
-        new_log_pol = log_policy
+            # The critic
+            value_loss = ((values-reward_to_go[mb_inds])**2).mean(dim=0).mean()
+            value_loss.backward()
+
+            # Running one optimizer step
+            nn.utils.clip_grad_norm_(parameters=agent.parameters(),max_norm=args.max_gradient_norm)
+            optimizer.step()
+            optimizer.zero_grad()
 
         loss_critic[i] = value_loss.item()
         loss_actor[i] = expected_minus_L.item()
@@ -146,6 +171,8 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
     heavy_args.logger.add_scalar("Loss/actor",loss_actor.mean(),heavy_args.logger_step)
     heavy_args.logger.add_scalar("Loss/critic",loss_critic.mean(),heavy_args.logger_step)
     heavy_args.logger.add_scalar("Loss/entropy",entropy.mean().item(),heavy_args.logger_step)
+    heavy_args.logger.add_scalar("Loss/approxKL",approx_kl.item(),heavy_args.logger_step)
+    heavy_args.logger.add_scalar("Loss/clipfrac",np.mean(clip_frac).item(),heavy_args.logger_step)
 
     heavy_args.logger.add_scalar("Critic/value",value.mean().item(),heavy_args.logger_step)
     heavy_args.logger.add_scalar("Critic/reward_to_go",reward_to_go.mean().item(),heavy_args.logger_step)

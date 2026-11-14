@@ -1,3 +1,4 @@
+from yams_rl.benchmark.evaluate import evaluate
 import dataclasses
 import os
 from datetime import datetime
@@ -8,7 +9,7 @@ import torch
 import tyro
 from torch.utils.tensorboard import SummaryWriter
 
-from yams_rl.rl.config import Args
+from yams_rl.rl.config import Args, EvalArgs
 from yams_rl.rl.env import WrapperCartPole, YamsEnv
 from yams_rl.rl.model import Agent
 from yams_rl.rl.ppo import HeavyArgs, run_one_ppo_iter
@@ -64,24 +65,28 @@ def train_agent(args:Args):
         assert args.lr_decay_iter_start<=args.num_ppo_iter
 
     score = torch.zeros(size=(args.num_ppo_iter,))
+    initial_optim_lr = args.optim_lr
+    initial_entropy_coef = args.entropy_coef
     for i in range(args.num_ppo_iter):
         print(f"Run PPO {i+1}/{args.num_ppo_iter}")
 
         if args.lr_decay and i>=args.lr_decay_iter_start:
-            lr_step = (args.optim_lr - args.lr_decay_min)/(args.num_ppo_iter-args.lr_decay_iter_start)
+            lr_step = (initial_optim_lr - args.lr_decay_min)/(args.num_ppo_iter-args.lr_decay_iter_start)
             heavy_args.optimizer.param_groups[0]["lr"] -= lr_step
 
         if args.entropy_coef_decay and i>=args.entropy_decay_iter_start:
-            entropy_coef_step = (args.entropy_coef - args.entropy_decay_min)/(args.num_ppo_iter-args.lr_decay_iter_start)
+            entropy_coef_step = (initial_entropy_coef - args.entropy_decay_min)/(args.num_ppo_iter-args.entropy_decay_iter_start)
             args.entropy_coef -= entropy_coef_step
 
         observations, done, mask, mean_score = run_one_ppo_iter(args=args,heavy_args=heavy_args)
-        heavy_args.next_done = done[-1]
+        heavy_args.next_done = done.reshape((args.num_step,args.num_envs))[-1]
         heavy_args.next_obs = observations
         heavy_args.next_mask = mask
         score[i] = mean_score
         heavy_args.logger_step += args.num_step*args.num_envs # This counter allow to compare different runs with different num_step or num_envs
 
+    args.optim_lr = initial_optim_lr
+    args.entropy_coef = initial_entropy_coef
     save_dict = {
         "model_state_dict":agent.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
@@ -95,8 +100,10 @@ def train_agent(args:Args):
     os.makedirs("models/",exist_ok=True)
     torch.save(save_dict,f"models/agent_{args.env_id}_{timestamp}.pt")
 
-    # TODO: replace the hparam/score with a real evaluation metric
-    writer.add_hparams(hparam_dict=dataclasses.asdict(args),metric_dict={"hparam/score":score.nanmean()})
+    # Model is small so it's ok to reload it
+    eval_args = EvalArgs(player_type="Agent",model_path=f"models/agent_{args.env_id}_{timestamp}.pt",stochastic_policy=True)
+    mean,_,std_error = evaluate(eval_args)
+    writer.add_hparams(hparam_dict=dataclasses.asdict(args),metric_dict={"hparam/mean":mean,"hparam/stderror":std_error})
 
 
 if __name__== "__main__":

@@ -1,4 +1,3 @@
-from yams_rl.yams.dice import Dices
 import numpy as np
 import torch
 import tyro
@@ -9,6 +8,7 @@ from yams_rl.rl.agent_player import AgentPlayer
 from yams_rl.rl.config import EvalArgs
 from yams_rl.rl.model import Agent, load_model
 from yams_rl.yams.constant import NB_DICES
+from yams_rl.yams.dice import Dices
 from yams_rl.yams.engine import play_one_game
 from yams_rl.yams.players import GreedyPlayer, Player, RandomPlayer
 
@@ -50,7 +50,7 @@ def evaluate(args:EvalArgs) -> tuple[float,float,float]:
         torch.manual_seed(int(seeds[1].generate_state(1).item()))
         players:list[Player] = build_players(args=args,seeds=seeds[2:],model=model)
         dices:Dices = Dices(dice_number=NB_DICES, seed=seeds[0])
-        totals =  play_one_game(players=players, dices=dices, seed=seeds[0])
+        totals =  play_one_game(players=players, dices=dices)
         return totals
 
     totals_counter = Parallel(n_jobs=-1)(

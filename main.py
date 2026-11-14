@@ -8,7 +8,7 @@ def main() -> None:
     number_of_players=2
     players:list[Player] = [HumanPlayer(f"Player_{i}") for i in range(number_of_players)]
     dices = Dices(dice_number=NB_DICES,seed=25)
-    play_one_game(players=players, dices=dices, seed=10)
+    play_one_game(players=players, dices=dices)
 
 if __name__ == "__main__":
     main()
