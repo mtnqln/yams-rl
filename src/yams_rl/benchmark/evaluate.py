@@ -1,3 +1,4 @@
+from yams_rl.yams.dice import Dices
 import numpy as np
 import torch
 import tyro
@@ -48,7 +49,8 @@ def evaluate(args:EvalArgs) -> tuple[float,float,float]:
         seeds = sq.spawn(number_of_players+2) # Number of players + pytorch + dices
         torch.manual_seed(int(seeds[1].generate_state(1).item()))
         players:list[Player] = build_players(args=args,seeds=seeds[2:],model=model)
-        totals =  play_one_game(players=players, dice_number=NB_DICES, seed=seeds[0])
+        dices:Dices = Dices(dice_number=NB_DICES, seed=seeds[0])
+        totals =  play_one_game(players=players, dices=dices, seed=seeds[0])
         return totals
 
     totals_counter = Parallel(n_jobs=-1)(

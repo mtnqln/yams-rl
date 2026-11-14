@@ -29,9 +29,9 @@ class Agent(nn.Module):
 
         # Network that will learn the policy
         self.actor = nn.Sequential(
-            layer_init(layer=nn.Linear(size_input,128)),
+            layer_init(layer=nn.Linear(size_input,256)),
             nn.Tanh(),
-            layer_init(layer=nn.Linear(128,256)),
+            layer_init(layer=nn.Linear(256,256)),
             nn.Tanh(),
             layer_init(layer=nn.Linear(256,512)),
             nn.Tanh(),
@@ -43,9 +43,9 @@ class Agent(nn.Module):
         )
         # Network that will learn the Value function, takes the state s_t as input
         self.critic = nn.Sequential(
-            layer_init(layer=nn.Linear(size_input,128)),
+            layer_init(layer=nn.Linear(size_input,256)),
             nn.Tanh(),
-            layer_init(layer=nn.Linear(128,256)),
+            layer_init(layer=nn.Linear(256,256)),
             nn.Tanh(),
             layer_init(layer=nn.Linear(256,512)),
             nn.Tanh(),

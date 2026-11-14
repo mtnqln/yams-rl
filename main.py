@@ -1,3 +1,5 @@
+from yams_rl.yams.constant import NB_DICES
+from yams_rl.yams.dice import Dices
 from yams_rl.yams.engine import play_one_game
 from yams_rl.yams.players import HumanPlayer, Player
 
@@ -5,7 +7,8 @@ from yams_rl.yams.players import HumanPlayer, Player
 def main() -> None:
     number_of_players=2
     players:list[Player] = [HumanPlayer(f"Player_{i}") for i in range(number_of_players)]
-    play_one_game(players=players, dice_number=5,seed=10)
+    dices = Dices(dice_number=NB_DICES,seed=25)
+    play_one_game(players=players, dices=dices, seed=10)
 
 if __name__ == "__main__":
     main()

@@ -8,14 +8,16 @@ from yams_rl.yams.scoring import score
 
 
 class GameState:
-    def __init__(self, players: int, nb_max_roll:int, dices:Dices):
+    def __init__(self, players: int, nb_max_roll:int, dices:Dices, start_turn:bool=True):
         self.players_and_scores = np.full(fill_value=np.nan,shape=(players,len(Category)))
         self.players_number = players
         self.current_player_id = 0
         self.current_player_roll_number = 0
         self.nb_max_roll = nb_max_roll
         self.dices = dices
-        self._start_turn()
+        self.start_turn = start_turn
+        if start_turn:
+            self._start_turn()
 
     def _start_turn(self):
         self.dices.roll(reroll_mask=np.ones(self.dices.dice_number, dtype=bool))
@@ -63,7 +65,7 @@ class GameState:
 
             self.scores(player_id=self.current_player_id,category=action,dices=self.dices)
             self.current_player_id = (self.current_player_id+1)%self.players_number # modulus the number of player
-            if not self.is_over():
+            if not self.is_over() and self.start_turn:
                 self._start_turn()
 
     def get_winner(self)->tuple[int,int]:
