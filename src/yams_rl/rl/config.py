@@ -10,7 +10,7 @@ class Args:
     env_id: Literal["CartPole-v1","YamsEnv"] = "YamsEnv"
     """The id of the environment"""
 
-    num_ppo_iter: int = 60_000
+    num_ppo_iter: int = 30_000
     """The number of ppo iteration"""
     num_step: int = 256
     """The number of steps to run in each environment per policy rollout"""
@@ -46,16 +46,23 @@ class Args:
     """Coefficient for the entropy term in the loss"""
     lr_decay: bool = True
     """Toggle the decay of the learning rate for the optimizer"""
-    lr_decay_iter_start: int = 20_000
+    lr_decay_iter_start: int = 10_000
     """Number of iteration after which the lr decay starts"""
     lr_decay_min: float = 0
     """Minimum value to be reach by the lr decay"""
     entropy_coef_decay: bool = True
     """Toggle the decay of the entropy coeff"""
-    entropy_decay_iter_start: int = 30_000
+    entropy_decay_iter_start: int = 15_000
     """Number of iteration after which the entropy coeff decay starts"""
     entropy_decay_min: float = 0.0005
     """Minimum value for the entropy coef decay"""
+
+    from_checkpoint: bool = False
+    """Whether to start the training from a checkpoint"""
+    checkpoint_path: str = "models/agent.pt"
+    """Checkpoint path"""
+    logger_step: int = 0
+    """When starting from a checkpoint; we want to start the tensorboard graph where we last finished and not from 0"""
 
 @dataclass
 class EvalArgs:

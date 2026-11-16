@@ -1,4 +1,4 @@
-from yams_rl.benchmark.evaluate import evaluate
+from torch.optim import AdamW
 import dataclasses
 import os
 from datetime import datetime
@@ -9,9 +9,10 @@ import torch
 import tyro
 from torch.utils.tensorboard import SummaryWriter
 
+from yams_rl.benchmark.evaluate import evaluate
 from yams_rl.rl.config import Args, EvalArgs
 from yams_rl.rl.env import WrapperCartPole, YamsEnv
-from yams_rl.rl.model import Agent
+from yams_rl.rl.model import Agent, load_model
 from yams_rl.rl.ppo import HeavyArgs, run_one_ppo_iter
 from yams_rl.rl.vec_env import SlowVecEnv
 
@@ -35,13 +36,20 @@ def train_agent(args:Args):
     size_output = envs.single_action_space.n
     assert size_input is not None
 
-    agent = Agent(size_input[0],size_output)
-    optimizer = torch.optim.AdamW(
-        agent.parameters(),
-        lr=args.optim_lr,
-        eps=args.optim_eps,
-        weight_decay=0 # using Adam
-    )
+    if args.from_checkpoint:
+        result = load_model(model_path=args.checkpoint_path,eval=False,return_optim=True)
+        assert isinstance(result,tuple)
+        agent = result[0]
+        optimizer:torch.optim.AdamW = result[1]
+        optimizer.param_groups[0]["lr"] = args.optim_lr
+    else:
+        agent = Agent(size_input[0],size_output)
+        optimizer = torch.optim.AdamW(
+            agent.parameters(),
+            lr=args.optim_lr,
+            eps=args.optim_eps,
+            weight_decay=0 # using Adam
+        )
 
     next_obs,_ = envs.reset()
     next_mask = envs.action_masks()
@@ -56,7 +64,7 @@ def train_agent(args:Args):
             next_obs=next_obs,
             next_done=next_done,
             logger=writer,
-            logger_step=0
+            logger_step=args.logger_step
         )
 
     if args.entropy_coef_decay:
@@ -98,10 +106,10 @@ def train_agent(args:Args):
     }
 
     os.makedirs("models/",exist_ok=True)
-    torch.save(save_dict,f"models/agent_{args.env_id}_{timestamp}.pt")
+    torch.save(save_dict,f"models/agent_{args.env_id}_seed={args.seed}_{timestamp}.pt")
 
     # Model is small so it's ok to reload it
-    eval_args = EvalArgs(player_type="Agent",model_path=f"models/agent_{args.env_id}_{timestamp}.pt",stochastic_policy=True)
+    eval_args = EvalArgs(player_type="Agent",model_path=f"models/agent_{args.env_id}_seed={args.seed}_{timestamp}.pt",stochastic_policy=True)
     mean,_,std_error = evaluate(eval_args)
     writer.add_hparams(hparam_dict=dataclasses.asdict(args),metric_dict={"hparam/mean":mean,"hparam/stderror":std_error})
 
