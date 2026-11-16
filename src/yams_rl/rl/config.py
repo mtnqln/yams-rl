@@ -26,7 +26,7 @@ class Args:
 
     num_minibatches: int = 4
     """the number of mini-batches"""
-    num_epochs_optim: int = 4
+    num_epochs_optim: int = 8
     """the K epochs to update the policy"""
     clip_epsilon: float = 0.2
     """ppo clip coefficient"""
@@ -61,8 +61,6 @@ class Args:
     """Whether to start the training from a checkpoint"""
     checkpoint_path: str = "models/agent.pt"
     """Checkpoint path"""
-    logger_step: int = 0
-    """When starting from a checkpoint; we want to start the tensorboard graph where we last finished and not from 0"""
 
 @dataclass
 class EvalArgs:

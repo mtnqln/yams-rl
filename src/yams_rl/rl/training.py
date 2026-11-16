@@ -1,4 +1,3 @@
-from torch.optim import AdamW
 import dataclasses
 import os
 from datetime import datetime
@@ -37,11 +36,14 @@ def train_agent(args:Args):
     assert size_input is not None
 
     if args.from_checkpoint:
-        result = load_model(model_path=args.checkpoint_path,eval=False,return_optim=True)
+        result = load_model(model_path=args.checkpoint_path,eval=False,return_checkpoint=True)
         assert isinstance(result,tuple)
         agent = result[0]
-        optimizer:torch.optim.AdamW = result[1]
+        checkpoint = result[1]
+        optimizer:torch.optim.AdamW = checkpoint["optimizer_state_dict"]
         optimizer.param_groups[0]["lr"] = args.optim_lr
+        logger_step = checkpoint["step_done"]
+
     else:
         agent = Agent(size_input[0],size_output)
         optimizer = torch.optim.AdamW(
@@ -50,6 +52,7 @@ def train_agent(args:Args):
             eps=args.optim_eps,
             weight_decay=0 # using Adam
         )
+        logger_step = 0
 
     next_obs,_ = envs.reset()
     next_mask = envs.action_masks()
@@ -64,7 +67,7 @@ def train_agent(args:Args):
             next_obs=next_obs,
             next_done=next_done,
             logger=writer,
-            logger_step=args.logger_step
+            logger_step=logger_step
         )
 
     if args.entropy_coef_decay:

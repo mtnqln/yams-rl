@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import torch
 from torch import nn
 from torch.distributions import Categorical
 
 
-def load_model(model_path:str,eval:bool=True,return_optim:bool=False)->Agent|tuple[Agent,torch.optim.AdamW]:
+def load_model(model_path:str,eval:bool=True,return_checkpoint:bool=False)->Agent|tuple[Agent,Any]:
         checkpoint = torch.load(model_path,weights_only=True)
         model = Agent(size_input=checkpoint["size_input"],size_output=checkpoint["size_output"])
         model.load_state_dict(checkpoint["model_state_dict"])
-        if return_optim:
-            return (model.eval() if eval else model.train(),checkpoint["optimizer_state_dict"])
+        if return_checkpoint:
+            return (model.eval() if eval else model.train(),checkpoint)
         else:
             return model.eval() if eval else model.train()
 
