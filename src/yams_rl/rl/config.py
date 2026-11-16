@@ -12,7 +12,7 @@ class Args:
 
     num_ppo_iter: int = 30_000
     """The number of ppo iteration"""
-    num_step: int = 256
+    num_step: int = 512
     """The number of steps to run in each environment per policy rollout"""
     num_envs: int = 16
     """The number of parallel game environments"""

@@ -40,8 +40,13 @@ def train_agent(args:Args):
         assert isinstance(result,tuple)
         agent = result[0]
         checkpoint = result[1]
-        optimizer:torch.optim.AdamW = checkpoint["optimizer_state_dict"]
-        optimizer.param_groups[0]["lr"] = args.optim_lr
+        optimizer = torch.optim.AdamW(
+            agent.parameters(),
+            lr=args.optim_lr,
+            eps=args.optim_eps,
+            weight_decay=0,  # using Adam
+        )
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         logger_step = checkpoint["step_done"]
 
     else:
@@ -104,7 +109,7 @@ def train_agent(args:Args):
         "size_input":int(size_input[0]),
         "size_output":int(size_output),
         "training_config":dataclasses.asdict(args),
-        "step_done":args.num_ppo_iter*(args.num_step*args.num_envs)
+        "step_done":heavy_args.logger_step
 
     }
 
