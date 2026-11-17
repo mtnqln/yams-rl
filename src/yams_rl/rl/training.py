@@ -30,7 +30,7 @@ def train_agent(args:Args):
         list_env = [WrapperCartPole(gym.make(args.env_id)) for _ in range(args.num_envs)]
     else:
         opponents = []
-        if args.finetune:
+        if args.finetuning:
             assert args.reward_mode=="victory", "Multiplayer finetuning must be run with reward_mode set as 'victory'"
             rng = np.random.default_rng(seed=args.seed)
             opponents = []

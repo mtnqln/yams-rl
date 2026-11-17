@@ -62,7 +62,7 @@ class Args:
     checkpoint_path: str = "models/agent.pt"
     """Checkpoint path"""
 
-    finetune: bool = False
+    finetuning: bool = False
     """Whether to finetune or not the agent in multiplayer"""
     opponents: tuple[Literal["RandomPlayer","Agent","GreedyPlayer"],...] = ()
     """Opponents to train the agent with; the agent means a frozen copy of the given agent with the path"""
