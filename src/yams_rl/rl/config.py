@@ -62,17 +62,24 @@ class Args:
     checkpoint_path: str = "models/agent.pt"
     """Checkpoint path"""
 
+    finetune: bool = False
+    """Whether to finetune or not the agent in multiplayer"""
+    opponents: tuple[Literal["RandomPlayer","Agent","GreedyPlayer"],...] = ()
+    """Opponents to train the agent with; the agent means a frozen copy of the given agent with the path"""
+    opponents_path: tuple[str,...] = ("models/agent.pt",)
+    """Paths to the models weights selected for to train the agent"""
+
 @dataclass
 class EvalArgs:
-    model_path: str = "models/agent.pt"
-    """Path to the model weights"""
-    player_type: Literal["RandomPlayer","Agent","GreedyPlayer"] = "RandomPlayer"
-    """Type of player to evaluate"""
+    model_path: tuple[str,...] = ("models/agent.pt",)
+    """Paths to the models weights selected for the 'players' option"""
+    players: tuple[Literal["RandomPlayer","Agent","GreedyPlayer"],...] = ("RandomPlayer",)
+    """Player to evaluate; more than one player means multiplayer game"""
     size_evaluation: int = 10_000
     """Number of evaluations to run"""
-    number_players: int = 1
-    """Number of player to put in the evaluation"""
     stochastic_policy: bool = True
     """Whether to use stochastic policy or deterministic policy (for the neural network)"""
     seed_offset: int = 0
     """Offset to add to the seed generator key in order to change randomness for the eval"""
+    shuffle_seat: bool = False
+    """Whether to shuffle the seat order for the players"""

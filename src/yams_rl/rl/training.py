@@ -1,5 +1,6 @@
 import dataclasses
 import os
+from copy import deepcopy
 from datetime import datetime
 
 import gymnasium as gym
@@ -14,6 +15,7 @@ from yams_rl.rl.env import WrapperCartPole, YamsEnv
 from yams_rl.rl.model import Agent, load_model
 from yams_rl.rl.ppo import HeavyArgs, run_one_ppo_iter
 from yams_rl.rl.vec_env import SlowVecEnv
+from yams_rl.yams.player_factory import build_one_player
 
 
 def train_agent(args:Args):
@@ -27,7 +29,20 @@ def train_agent(args:Args):
     if args.env_id=="CartPole-v1":
         list_env = [WrapperCartPole(gym.make(args.env_id)) for _ in range(args.num_envs)]
     else:
-        list_env = [YamsEnv(nb_players=args.num_player,reward_mode=args.reward_mode,reward_norm_const=args.reward_norm_const) for _ in range(args.num_envs)]
+        opponents = []
+        if args.finetune:
+            assert args.reward_mode=="victory", "Multiplayer finetuning must be run with reward_mode set as 'victory'"
+            rng = np.random.default_rng(seed=args.seed)
+            opponents = []
+            c = 0
+            model=None
+            for idx,p in enumerate(args.opponents):
+                if p=="Agent":
+                    model = load_model(model_path=args.opponents_path[c],eval=True)
+                    c+=1
+                opponents.append(build_one_player(player_type=p, seed=int(rng.integers(low=0,high=2**32)), model=model,player_id=idx, stochastic=True))
+
+        list_env = [YamsEnv(nb_players=args.num_player,reward_mode=args.reward_mode,reward_norm_const=args.reward_norm_const,opponents_list=deepcopy(opponents)) for _ in range(args.num_envs)]
 
     envs = SlowVecEnv(envs=list_env,generator=generator,args=args)
 
@@ -47,6 +62,7 @@ def train_agent(args:Args):
             weight_decay=0,  # using Adam
         )
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        optimizer.param_groups[0]["lr"] = args.optim_lr
         logger_step = checkpoint["step_done"]
 
     else:
@@ -58,6 +74,7 @@ def train_agent(args:Args):
             weight_decay=0 # using Adam
         )
         logger_step = 0
+
 
     next_obs,_ = envs.reset()
     next_mask = envs.action_masks()
@@ -110,14 +127,13 @@ def train_agent(args:Args):
         "size_output":int(size_output),
         "training_config":dataclasses.asdict(args),
         "step_done":heavy_args.logger_step
-
     }
 
     os.makedirs("models/",exist_ok=True)
     torch.save(save_dict,f"models/agent_{args.env_id}_seed={args.seed}_{timestamp}.pt")
 
     # Model is small so it's ok to reload it
-    eval_args = EvalArgs(player_type="Agent",model_path=f"models/agent_{args.env_id}_seed={args.seed}_{timestamp}.pt",stochastic_policy=True)
+    eval_args = EvalArgs(players=("Agent",),model_path=(f"models/agent_{args.env_id}_seed={args.seed}_{timestamp}.pt",),stochastic_policy=True)
     mean,_,std_error = evaluate(eval_args)
     writer.add_hparams(hparam_dict=dataclasses.asdict(args),metric_dict={"hparam/mean":mean,"hparam/stderror":std_error})
 

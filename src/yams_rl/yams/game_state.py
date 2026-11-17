@@ -78,6 +78,11 @@ class GameState:
     def total_player(self,player_id:int)->int:
         return int(np.nansum(self.players_and_scores[player_id]))
 
+    def results(self,tie_value:float)->np.ndarray:
+        scores = self.totals()
+        best = scores.max()
+        return np.where(scores == best,1 if (scores == best).sum()==1 else tie_value,0)
+
     def totals(self)->np.ndarray:
         """
         Returns the total for all players

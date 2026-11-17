@@ -1,3 +1,4 @@
+from yams_rl.rl.agent_player import AgentPlayer
 from yams_rl.rl.encoding import build_observation, build_action_mask
 from typing import Literal
 
@@ -36,11 +37,11 @@ class WrapperCartPole(gym.Wrapper):
 
 
 class YamsEnv(gym.Env):
-    def __init__(self,nb_players:int=1,reward_mode:Literal["delta","victory"]="delta",reward_norm_const:int=25):
+    def __init__(self,nb_players:int=1,reward_mode:Literal["delta","victory"]="delta",reward_norm_const:int=25,opponents_list:list|None=None):
         super().__init__()
 
         self.MAX_OPPONENTS = MAX_OPPONENTS
-        assert nb_players<self.MAX_OPPONENTS, f"The number of players is higher than the maximum : {self.MAX_OPPONENTS}"
+        assert nb_players<=self.MAX_OPPONENTS+1, f"The number of players is higher than the maximum : {self.MAX_OPPONENTS+1}"
         self.nb_players:int = nb_players
         self.dice_number:int = NB_DICES
         self.nb_max_rolls:int = NB_MAX_ROLLS
@@ -75,6 +76,7 @@ class YamsEnv(gym.Env):
         # Will be initialized with .reset()
         self.state:GameState
         self.agent_id:int
+        self.opponents_list = []
         self.opponents:dict[int,Player]
 
     def _set_state(self,state:GameState):
@@ -100,19 +102,29 @@ class YamsEnv(gym.Env):
     def reset(self,seed:int|None=None,options:dict|None=None):
         super().reset(seed=seed)
         seed = seed if seed else self.np_random_seed
-        self.agent_id = options["agent_id"] if options and "agent_id" in options else 0
+        rng = np.random.default_rng(seed=seed)
+        self.agent_id = options["agent_id"] if options and "agent_id" in options else int(rng.integers(low=0,high=self.nb_players))
 
-        if options and "opponents" in options:
-            assert len(options["opponents"])==self.nb_players-1, f"Number of opponents not matching the number of players: {len(options["opponents"])} != {self.nb_players}-1"
-            iter_opponents = iter(options["opponents"])
+        if self.opponents_list is not None:
+            assert len(self.opponents_list)==self.nb_players-1, f"Number of opponents not matching the number of players: {len(self.opponents_list)} != {self.nb_players}-1"
+            iter_opponents = iter(self.opponents_list)
             self.opponents = {op_id:next(iter_opponents) for op_id in range(self.nb_players) if op_id!=self.agent_id}
-        else:
-            self.opponents = {}
+
+
+        for key in self.opponents:
+            if isinstance(self.opponents[key],AgentPlayer):
+                self.opponents[key].agent_id = key  # ty: ignore[unresolved-attribute]
 
         dices = Dices(dice_number=self.dice_number,seed=seed)
         state = GameState(players=self.nb_players,dices=dices,nb_max_roll=self.nb_max_rolls)
 
         self._set_state(state=state)
+
+        # Playing until it's the agent turn
+        while self.state.current_player_id != self.agent_id and not self.state.is_over():
+            opponent_action = self.opponents[self.state.current_player_id].act(self.state)
+            self.state.step(opponent_action)
+
         observation = self._get_obs()
 
         return observation,{} #info
@@ -132,14 +144,14 @@ class YamsEnv(gym.Env):
         self.state.step(actual_action)
         score_after = self.agent_score()
 
-        if self.reward_mode == "delta":
-            reward = (score_after - score_before) / self.reward_norm_const # normalization
-        else:
-            reward = 1 if self.state.is_over() and self.state.get_winner()[1] == self.agent_id else 0 # case of equality to be hanble yet
-
         while self.state.current_player_id != self.agent_id and not self.state.is_over():
             opponent_action = self.opponents[self.state.current_player_id].act(self.state)
             self.state.step(opponent_action)
+
+        if self.reward_mode == "delta":
+            reward = (score_after - score_before) / self.reward_norm_const # normalization
+        else:
+            reward = self.state.results(tie_value=0.5)[self.agent_id]
 
         observation = self._get_obs()
 

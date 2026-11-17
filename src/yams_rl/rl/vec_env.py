@@ -28,10 +28,10 @@ class SlowVecEnv:
 
         self.generator = generator
 
-    def reset(self)->tuple[torch.Tensor,dict]:
+    def reset(self,options:dict|None=None)->tuple[torch.Tensor,dict]:
         for idx,env in enumerate(self.envs):
             seed = int(self.generator.integers(low=1,high=2**31))
-            obs,_ = env.reset(seed=seed)
+            obs,_ = env.reset(seed=seed,options=options)
             self.observations[idx] = torch.from_numpy(obs)
         return (self.observations.clone(),{})
 

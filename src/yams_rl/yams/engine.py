@@ -7,7 +7,7 @@ from yams_rl.yams.constant import NB_MAX_ROLLS
 from yams_rl.yams.game_state import Dices, GameState
 
 
-def play_one_game(players: list[Player],dices:Dices,logger_before:Callable|None=None,logger_after:Callable|None=None)->list[int]:
+def play_one_game(players: list[Player],dices:Dices,logger_before:Callable|None=None,logger_after:Callable|None=None)->GameState:
     state:GameState = GameState(players=len(players),dices=dices,nb_max_roll=NB_MAX_ROLLS,start_turn=False)
 
     previous_player:int
@@ -31,4 +31,4 @@ def play_one_game(players: list[Player],dices:Dices,logger_before:Callable|None=
         else:
             new_turn = False
 
-    return state.totals().tolist()
+    return state

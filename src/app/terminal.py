@@ -1,3 +1,4 @@
+from yams_rl.yams.player_factory import build_one_player
 from dataclasses import dataclass
 from typing import Literal
 
@@ -46,12 +47,14 @@ def play(args:PlayArgs):
     model = None
     if args.player_type=="Agent":
         model = load_model(args.model_path)
+        assert isinstance(model,Agent),"Model must be an Agent"
     agent = build_players(args,seeds[1:],model)
 
     players.insert(args.agent_id,agent)
     dices = ManualDices(dice_number=NB_DICES,seed=seeds[0]) if args.dices=="ManualDices" else Dices(dice_number=NB_DICES,seed=seeds[0])
-    totals = play_one_game(players=players,dices=dices,logger_after=logger_after,logger_before=logger_before)
+    gamestate = play_one_game(players=players,dices=dices,logger_after=logger_after,logger_before=logger_before)
 
+    totals = gamestate.totals().tolist()
     for t,p in zip(totals,players):
         print(f"Player {p.name} has a total of {t}")
 
@@ -67,14 +70,7 @@ def logger_after(players:list[Player],previous_player:int,state:GameState,action
         print(f"Current player grid is : {state.players_and_scores[previous_player]}")
 
 def build_players(args:PlayArgs,seeds:list[int]|list[SeedSequence],model:Agent|None=None)->Player:
-    if args.player_type=="RandomPlayer":
-        return RandomPlayer(f"Player_{args.agent_id}",seed=seeds[0])
-    elif args.player_type=="Agent":
-        assert model is not None,"No model provided for agent evaluation"
-        return AgentPlayer(model=model,agent_id=args.agent_id,stochastic=args.stochastic_policy)
-    else:
-        assert args.player_type=="GreedyPlayer"
-        return GreedyPlayer(name=f"greedy-player-{args.agent_id}")
+    return build_one_player(args.player_type,seeds[0],model,args.agent_id,args.stochastic_policy)
 
 
 if __name__=="__main__":
