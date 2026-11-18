@@ -1,5 +1,5 @@
-from copy import deepcopy
 import collections
+from copy import deepcopy
 
 import gymnasium
 import numpy as np

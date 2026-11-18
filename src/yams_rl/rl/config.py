@@ -16,11 +16,7 @@ class Args:
     """The number of steps to run in each environment per policy rollout"""
     num_envs: int = 16
     """The number of parallel game environments"""
-    num_player: int = 1
-    """Number of player per environment; currently only support one"""
 
-    reward_mode: Literal["delta","victory"] = "delta"
-    """Reward mode to train the agent for the Yams environment, victory is 1=win 0=loose; delta is the difference of score between each round"""
     reward_norm_const: int = 25
     """Normalization constant for the reward"""
 
@@ -44,26 +40,18 @@ class Args:
     """Optimizer (AdamW) epsilon"""
     entropy_coef: float = 0.01
     """Coefficient for the entropy term in the loss"""
-    lr_decay: bool = True
-    """Toggle the decay of the learning rate for the optimizer"""
-    lr_decay_iter_start: int = 10_000
+    lr_decay_iter_start: int|None = 10_000
     """Number of iteration after which the lr decay starts"""
     lr_decay_min: float = 0
     """Minimum value to be reach by the lr decay"""
-    entropy_coef_decay: bool = True
-    """Toggle the decay of the entropy coeff"""
-    entropy_decay_iter_start: int = 15_000
+    entropy_decay_iter_start: int|None = 15_000
     """Number of iteration after which the entropy coeff decay starts"""
     entropy_decay_min: float = 0.0005
     """Minimum value for the entropy coef decay"""
 
-    from_checkpoint: bool = False
-    """Whether to start the training from a checkpoint"""
-    checkpoint_path: str = "models/agent.pt"
+    checkpoint_path: str|None = None
     """Checkpoint path"""
 
-    finetuning: bool = False
-    """Whether to finetune or not the agent in multiplayer"""
     opponents: tuple[Literal["RandomPlayer","Agent","GreedyPlayer"],...] = ()
     """Opponents to train the agent with; the agent means a frozen copy of the given agent with the path"""
     opponents_path: tuple[str,...] = ("models/agent.pt",)

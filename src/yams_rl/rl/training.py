@@ -26,13 +26,16 @@ def train_agent(args:Args):
     seed = generator.integers(low=1,high=2**31)
     torch.manual_seed(seed)
 
+    num_player = len(args.opponents)+1
+
     if args.env_id=="CartPole-v1":
         list_env = [WrapperCartPole(gym.make(args.env_id)) for _ in range(args.num_envs)]
     else:
         opponents = []
-        if args.finetuning:
-            assert args.reward_mode=="victory", "Multiplayer finetuning must be run with reward_mode set as 'victory'"
+        if len(args.opponents)!=0:
+            assert args.checkpoint_path is not None
             rng = np.random.default_rng(seed=args.seed)
+            reward_mode = "victory"
             opponents = []
             c = 0
             model=None
@@ -41,8 +44,9 @@ def train_agent(args:Args):
                     model = load_model(model_path=args.opponents_path[c],eval=True)
                     c+=1
                 opponents.append(build_one_player(player_type=p, seed=int(rng.integers(low=0,high=2**32)), model=model,player_id=idx, stochastic=True))
-
-        list_env = [YamsEnv(nb_players=args.num_player,reward_mode=args.reward_mode,reward_norm_const=args.reward_norm_const,opponents_list=deepcopy(opponents)) for _ in range(args.num_envs)]
+        else:
+            reward_mode = "delta"
+        list_env = [YamsEnv(nb_players=num_player,reward_mode=reward_mode,reward_norm_const=args.reward_norm_const,opponents_list=deepcopy(opponents)) for _ in range(args.num_envs)]
 
     envs = SlowVecEnv(envs=list_env,generator=generator,args=args)
 
@@ -50,7 +54,7 @@ def train_agent(args:Args):
     size_output = envs.single_action_space.n
     assert size_input is not None
 
-    if args.from_checkpoint:
+    if args.checkpoint_path:
         result = load_model(model_path=args.checkpoint_path,eval=False,return_checkpoint=True)
         assert isinstance(result,tuple)
         agent = result[0]
@@ -92,9 +96,9 @@ def train_agent(args:Args):
             logger_step=logger_step
         )
 
-    if args.entropy_coef_decay:
+    if args.entropy_decay_iter_start:
         assert args.entropy_decay_iter_start<=args.num_ppo_iter
-    if args.lr_decay:
+    if args.lr_decay_iter_start:
         assert args.lr_decay_iter_start<=args.num_ppo_iter
 
     score = torch.zeros(size=(args.num_ppo_iter,))
@@ -103,11 +107,11 @@ def train_agent(args:Args):
     for i in range(args.num_ppo_iter):
         print(f"Run PPO {i+1}/{args.num_ppo_iter}")
 
-        if args.lr_decay and i>=args.lr_decay_iter_start:
+        if args.lr_decay_iter_start and i>=args.lr_decay_iter_start:
             lr_step = (initial_optim_lr - args.lr_decay_min)/(args.num_ppo_iter-args.lr_decay_iter_start)
             heavy_args.optimizer.param_groups[0]["lr"] -= lr_step
 
-        if args.entropy_coef_decay and i>=args.entropy_decay_iter_start:
+        if args.entropy_decay_iter_start and i>=args.entropy_decay_iter_start:
             entropy_coef_step = (initial_entropy_coef - args.entropy_decay_min)/(args.num_ppo_iter-args.entropy_decay_iter_start)
             args.entropy_coef -= entropy_coef_step
 
@@ -135,7 +139,8 @@ def train_agent(args:Args):
     # Model is small so it's ok to reload it
     eval_args = EvalArgs(players=("Agent",),model_path=(f"models/agent_{args.env_id}_seed={args.seed}_{timestamp}.pt",),stochastic_policy=True)
     mean,_,std_error = evaluate(eval_args)
-    writer.add_hparams(hparam_dict=dataclasses.asdict(args),metric_dict={"hparam/mean":mean,"hparam/stderror":std_error})
+    hparams = {key: str(value) if isinstance(value, (tuple, list)) else value for key, value in dataclasses.asdict(args).items()}
+    writer.add_hparams(hparam_dict=hparams,metric_dict={"hparam/mean":mean,"hparam/stderror":std_error})
 
 
 if __name__== "__main__":

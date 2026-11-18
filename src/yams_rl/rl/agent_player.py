@@ -11,19 +11,19 @@ from yams_rl.yams.players import Player
 
 class AgentPlayer(Player):
 
-    def __init__(self,model:Agent,agent_id:int,stochastic:bool=True):
+    def __init__(self,model:Agent,player_id:int,stochastic:bool=True):
         super().__init__()
 
-        self.name = str(agent_id)
-        self.agent_id = agent_id
+        self.name = str(player_id)
+        self.player_id = player_id
         self.stochastic = stochastic
         self.model = model
         self.inf_mask = torch.full(fill_value=torch.finfo(torch.float32).min,size=(self.model.size_output,))
 
     def act(self, state: GameState) -> Action:
         with torch.no_grad():
-            assert state.current_player_id==self.agent_id, "Desynchronisation between agent id and the current player id"
-            obs = torch.from_numpy(build_observation(state=state,nb_players=state.players_number,agent_id=self.agent_id))
+            assert state.current_player_id==self.player_id, "Desynchronisation between agent id and the current player id"
+            obs = torch.from_numpy(build_observation(state=state,nb_players=state.players_number,agent_id=self.player_id))
             mask = torch.from_numpy(build_action_mask(state=state,dice_number=state.dices.dice_number))
             logits = self.model(obs)
             logits = logits + (~mask)*self.inf_mask

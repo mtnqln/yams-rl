@@ -21,14 +21,16 @@ from itertools import combinations_with_replacement, product
 
 class Player(ABC):
     name: str
+    player_id: int
 
     @abstractmethod
     def act(self, state: GameState) -> Action:
         pass
 
 class HumanPlayer(Player):
-    def __init__(self, name: str):
+    def __init__(self, name: str, player_id: int):
         self.name = name
+        self.player_id = player_id
 
     def act(self,state:GameState)->Action:
         if state.current_player_roll_number == state.nb_max_roll:
@@ -64,7 +66,8 @@ class HumanPlayer(Player):
 
 
 class RandomPlayer(Player):
-    def __init__(self, name: str, seed:int|SeedSequence):
+    def __init__(self, name: str, player_id: int, seed:int|SeedSequence):
+        self.player_id = player_id
         self.name = name
         self.generator = np.random.default_rng(seed=seed)
 
@@ -86,7 +89,8 @@ class RandomPlayer(Player):
 
 
 class GreedyPlayer(Player):
-    def __init__(self, name: str):
+    def __init__(self, name: str, player_id:int):
+        self.player_id = player_id
         self.name = name
 
     def act(self,state:GameState)->Action:

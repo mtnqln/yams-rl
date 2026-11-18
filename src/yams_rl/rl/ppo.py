@@ -180,6 +180,9 @@ def run_one_ppo_iter(args:Args,heavy_args:HeavyArgs):
     if done.any():
         agents_mean_score = scores[done.bool()].mean(dtype=torch.float).item()
         heavy_args.logger.add_scalar("Actor/total",agents_mean_score,heavy_args.logger_step)
+        if args.opponents:
+            agent_winrate = rewards[done.bool()].mean(dtype=torch.float).item()
+            heavy_args.logger.add_scalar("Actor/winrate",agent_winrate,heavy_args.logger_step)
 
         return next_obs, done, next_mask , agents_mean_score
     else:

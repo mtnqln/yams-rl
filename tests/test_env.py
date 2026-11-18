@@ -36,9 +36,9 @@ def test_random_player_env():
     for i in range(10_000):
         seed:int = int(generator.integers(low=1,high=1_000_000))
         env = YamsEnv(nb_players=5,reward_mode="delta")
-        options = {"agent_id":0,"opponents":[RandomPlayer(name=f"P{i}",seed=seed+i) for i in range(4)]}
+        options = {"agent_id":0,"opponents":[RandomPlayer(name=f"P{i}",player_id=i,seed=seed+i) for i in range(4)]}
         env.reset(seed=seed,options=options)
-        a1 = RandomPlayer(name="a1",seed=seed+8)
+        a1 = RandomPlayer(name="a1",player_id=0,seed=seed+8)
         over = False
         while not over:
             action:Action = a1.act(env.state)

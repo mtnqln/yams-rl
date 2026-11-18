@@ -1,16 +1,13 @@
-from yams_rl.rl.agent_player import AgentPlayer
-from yams_rl.rl.encoding import build_observation, build_action_mask
 from typing import Literal
 
 import gymnasium as gym
 import numpy as np
 
+from yams_rl.rl.agent_player import AgentPlayer
 from yams_rl.rl.constant import (
     MAX_OPPONENTS,
-    SCALE_DICE_SCORE,
-    SCALE_PLAYER_GRID,
-    SCALE_REROLL,
 )
+from yams_rl.rl.encoding import build_action_mask, build_observation
 from yams_rl.rl.utils import nn_output_to_action
 from yams_rl.yams.categories import Category
 from yams_rl.yams.constant import NB_DICES, NB_MAX_ROLLS
@@ -42,7 +39,8 @@ class YamsEnv(gym.Env):
 
         self.MAX_OPPONENTS = MAX_OPPONENTS
         assert nb_players<=self.MAX_OPPONENTS+1, f"The number of players is higher than the maximum : {self.MAX_OPPONENTS+1}"
-        self.nb_players:int = nb_players
+        self.opponents_list = opponents_list or []
+        self.nb_players:int = len(self.opponents_list)+1
         self.dice_number:int = NB_DICES
         self.nb_max_rolls:int = NB_MAX_ROLLS
         self.reward_mode = reward_mode
@@ -76,8 +74,7 @@ class YamsEnv(gym.Env):
         # Will be initialized with .reset()
         self.state:GameState
         self.agent_id:int
-        self.opponents_list = []
-        self.opponents:dict[int,Player]
+        self.opponents:dict[int,Player] = {}
 
     def _set_state(self,state:GameState):
         self.state = state
@@ -105,15 +102,14 @@ class YamsEnv(gym.Env):
         rng = np.random.default_rng(seed=seed)
         self.agent_id = options["agent_id"] if options and "agent_id" in options else int(rng.integers(low=0,high=self.nb_players))
 
-        if self.opponents_list is not None:
-            assert len(self.opponents_list)==self.nb_players-1, f"Number of opponents not matching the number of players: {len(self.opponents_list)} != {self.nb_players}-1"
+        if self.opponents_list:
             iter_opponents = iter(self.opponents_list)
             self.opponents = {op_id:next(iter_opponents) for op_id in range(self.nb_players) if op_id!=self.agent_id}
-
+            for key in self.opponents:
+                self.opponents[key].player_id = key
 
         for key in self.opponents:
-            if isinstance(self.opponents[key],AgentPlayer):
-                self.opponents[key].agent_id = key  # ty: ignore[unresolved-attribute]
+            self.opponents[key].agent_id = key  # ty: ignore[unresolved-attribute]
 
         dices = Dices(dice_number=self.dice_number,seed=seed)
         state = GameState(players=self.nb_players,dices=dices,nb_max_roll=self.nb_max_rolls)
