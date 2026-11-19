@@ -1,4 +1,3 @@
-from yams_rl.yams.player_factory import build_one_player
 from dataclasses import dataclass
 from typing import Literal
 
@@ -6,7 +5,6 @@ import numpy as np
 import tyro
 from numpy.random import SeedSequence
 
-from yams_rl.rl.agent_player import AgentPlayer
 from yams_rl.rl.constant import MAX_OPPONENTS
 from yams_rl.rl.model import Agent, load_model
 from yams_rl.yams.categories import Action
@@ -14,8 +12,8 @@ from yams_rl.yams.constant import NB_DICES
 from yams_rl.yams.dice import Dices, ManualDices
 from yams_rl.yams.engine import play_one_game
 from yams_rl.yams.game_state import GameState
-from yams_rl.yams.players import GreedyPlayer, HumanPlayer, Player, RandomPlayer
-from yams_rl.yams.scoring import score
+from yams_rl.yams.player_factory import build_one_player
+from yams_rl.yams.players import HumanPlayer, Player
 
 
 @dataclass
@@ -26,7 +24,7 @@ class PlayArgs:
     """Type of agent to play with"""
     stochastic_policy: bool = False
     """Whether to use or not stochastic policy for the agent"""
-    model_path: str = "models/agent.pt"
+    model_path: str = ""
     """Path to the agent weights"""
     seed: int = 50
     """Seed for random reproducibility"""
@@ -39,13 +37,14 @@ def play(args:PlayArgs):
     number_players = len(players_name) + 1
     assert number_players-1<=MAX_OPPONENTS, "Too many players"
     assert args.agent_id < number_players, f"Agent position must be within [0,{number_players})"
-    players:list[Player] = [HumanPlayer(name=players_name[i]) for i in range(number_players-1)]
+    players:list[Player] = [HumanPlayer(name=players_name[i],player_id=i) for i in range(number_players-1)]
 
     sq = SeedSequence(entropy=args.seed,spawn_key=[args.seed])
     seeds = sq.spawn(number_players)
 
     model = None
     if args.player_type=="Agent":
+        assert args.model_path, "You must provide a path for loading the model"
         model = load_model(args.model_path)
         assert isinstance(model,Agent),"Model must be an Agent"
     agent = build_players(args,seeds[1:],model)
