@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Iterable
 import numpy as np
 from numpy.random import SeedSequence
 
+from yams_rl.yams.constant import NB_DICES
 from yams_rl.yams.categories import Action, Category
 
 if TYPE_CHECKING:
@@ -51,8 +52,13 @@ class HumanPlayer(Player):
             choice = input()
 
         if choice.strip() == "d":
-            print("Choose which dice to roll again 1=roll 0=keep")
-            dices = input()
+            while True:
+                print("Choose which dice to roll again 1=roll 0=keep")
+                dices = input()
+                if len(dices)==NB_DICES and all(dice=="1" or dice=="0" for dice in dices):
+                    break
+                else:
+                    print(f"Incorrect input make sure all numbers are either 0 or 1 and the lenght is {NB_DICES}")
             keep_dices = [dice=="1" for dice in dices]
             return np.array(keep_dices,dtype=bool)
         else:
